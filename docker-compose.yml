@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # 1. MongoDB Service
+  mongodb:
+    image: mongo:4.4
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db # Persist data
+
+  # 2. Backend Service (Node.js/Express)
+  backend:
+    build:
+      context: ./Backend # Build from the Dockerfile in the Backend directory
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "3000:3000" # Expose the backend API port
+    environment:
+      DB_HOST: mongodb # Tells the app to connect to the 'mongodb' service
+    depends_on:
+      - mongodb # Ensure MongoDB starts before the backend
+
+  # 3. Frontend Service (Nginx)
+  frontend:
+    build:
+      context: ./Frontend # Build from the Dockerfile in the Frontend directory
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "80:80" # Map host port 80 to container port 80 (where Nginx runs)
+    depends_on:
+      - backend # Frontend needs the backend to be running to proxy API calls
+
+volumes:
+  mongo-data:
