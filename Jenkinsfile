@@ -6,18 +6,16 @@ pipeline {
         DEPLOY_PATH = '/var/lib/jenkins/workspace/MyApp-Deployment'
     }
 
-    stages {
-        stage('Cleanup & Checkout') {
-            steps {
-                echo 'Cleaning up previous deployment directory...'
-                // Clear the workspace and clone the code (Jenkins handles the clone)
-                sh "rm -rf ${DEPLOY_PATH}/* || true" 
-                
-                // Copy the entire checked-out workspace content to the persistent deployment path
-                sh "cp -R . ${DEPLOY_PATH}/"
-            }
-        }
-
+    stage('Cleanup & Checkout') {
+    steps {
+        echo 'Cleaning up previous deployment directory...'
+        sh "rm -rf ${DEPLOY_PATH}/* || true" 
+        
+        // Copy only visible files (e.g., Frontend, Backend, docker-compose.yml, Jenkinsfile)
+        sh "cp -R --no-preserve=mode,ownership * ${DEPLOY_PATH}/"
+        echo "Code copied successfully to ${DEPLOY_PATH}"
+    }
+}
 	stage('Build & Deploy with Docker Compose') {
             steps {
                  script {
