@@ -19,7 +19,7 @@ pipeline {
                 
                 // Use rsync to copy all files from the current workspace, EXCLUDING the complex .git directory
                 // NOTE: This assumes 'rsync' is installed on your EC2 instance (it usually is on Ubuntu)
-                sh "sudo rsync -av --exclude='.git' . ${DEPLOY_PATH}/"
+                sh "rsync -av --exclude='.git' . ${DEPLOY_PATH}/"
                 echo "Code copied successfully to ${DEPLOY_PATH}"
             }
         }
