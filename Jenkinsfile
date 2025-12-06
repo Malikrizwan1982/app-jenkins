@@ -1,47 +1,63 @@
 pipeline {
     agent any
 
-    // Define the deployment location on the EC2 server
     environment {
-        DEPLOY_PATH = '/var/lib/jenkins/workspace/MyApp-Deployment'
+        // Define the path where the app will be deployed on the EC2 server
+        // This is within the Jenkins user's home/workspace
+        DEPLOY_PATH = '/var/lib/jenkins/workspace/MyApp-Deployment' 
     }
 
-    stage('Cleanup & Checkout') {
-    steps {
-        echo 'Cleaning up previous deployment directory...'
-        sh "rm -rf ${DEPLOY_PATH}/* || true" 
-        
-        // Copy only visible files (e.g., Frontend, Backend, docker-compose.yml, Jenkinsfile)
-        sh "cp -R --no-preserve=mode,ownership * ${DEPLOY_PATH}/"
-        echo "Code copied successfully to ${DEPLOY_PATH}"
-    }
-}
-	stage('Build & Deploy with Docker Compose') {
+    stages {
+        stage('Cleanup & Checkout') {
             steps {
-                 script {
-            		echo 'Cleaning up and rebuilding containers...'
-            		// Change directory to the copied project root
-            		sh "cd ${DEPLOY_PATH}"
-
-            		// Use a single command to down, remove, and build new containers
-            		// NOTE: We rely on the PATH environment variable now, which is safer.
-            		sh """
-            		/usr/local/bin/docker-compose -f docker-compose.yml down --remove-orphans || true
-            		/usr/local/bin/docker-compose -f docker-compose.yml up -d --build --force-recreate
-            		"""
-
-            		echo 'Deployment successful! App is running.'
+                echo "Starting pipeline..."
+                // Create the deployment directory if it doesn't exist
+                sh "mkdir -p ${DEPLOY_PATH} || true"
+                
+                // Clear the contents of the deployment folder for a clean build
+                sh "rm -rf ${DEPLOY_PATH}/* || true" 
+                
+                // Use rsync to copy all files from the current workspace, EXCLUDING the complex .git directory
+                // NOTE: This assumes 'rsync' is installed on your EC2 instance (it usually is on Ubuntu)
+                sh "sudo rsync -av --exclude='.git' . ${DEPLOY_PATH}/"
+                echo "Code copied successfully to ${DEPLOY_PATH}"
+            }
         }
-    }
-}         
 
-
+        stage('Build & Deploy with Docker Compose') {
+            steps {
+                script {
+                    echo 'Changing directory and executing Docker Compose...'
+                    // Change directory to the copied project root
+                    sh "cd ${DEPLOY_PATH}"
+                    
+                    // Stop and remove old containers, then build and start new ones
+                    sh """
+                    /usr/local/bin/docker-compose -f docker-compose.yml down --remove-orphans || true
+                    /usr/local/bin/docker-compose -f docker-compose.yml up -d --build --force-recreate
+                    """
+                    
+                    echo 'Deployment complete! Check your EC2 IP.'
+                }
+            }
+        }
+        
         stage('Verification') {
             steps {
-                // Simple health check on the frontend container
-                sh "docker ps | grep frontend"
-                echo "Verification step complete. Check your EC2 IP."
+                echo 'Verifying container status...'
+                // Check if all necessary containers are running
+                sh "/usr/local/bin/docker-compose -f ${DEPLOY_PATH}/docker-compose.yml ps"
+                echo "Verification step complete."
             }
+        }
+    }
+    
+    post {
+        always {
+            echo "Pipeline finished."
+        }
+        failure {
+            echo "Pipeline failed! Check console output for details."
         }
     }
 }
