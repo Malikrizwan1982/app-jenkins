@@ -18,24 +18,26 @@ pipeline {
             }
         }
 
-        stage('Build & Deploy with Docker Compose') {
+	stage('Build & Deploy with Docker Compose') {
             steps {
-                script {
-                    echo 'Building and starting containers...'
-                    // Change directory to the copied project root
-                    sh "cd ${DEPLOY_PATH}"
-                    
-                    // Stop and remove old containers, then build and start new ones
-                    sh """
-                    /usr/local/bin/docker-compose -f docker-compose.yml down || true
-                    /usr/local/bin/docker-compose -f docker-compose.yml up -d --build
-                    """
-                    
-                    echo 'Deployment successful! App is running.'
-                }
-            }
+                 script {
+            		echo 'Cleaning up and rebuilding containers...'
+            		// Change directory to the copied project root
+            		sh "cd ${DEPLOY_PATH}"
+
+            		// Use a single command to down, remove, and build new containers
+            		// NOTE: We rely on the PATH environment variable now, which is safer.
+            		sh """
+            		/usr/local/bin/docker-compose -f docker-compose.yml down --remove-orphans || true
+            		/usr/local/bin/docker-compose -f docker-compose.yml up -d --build --force-recreate
+            		"""
+
+            		echo 'Deployment successful! App is running.'
         }
-        
+    }
+}         
+
+
         stage('Verification') {
             steps {
                 // Simple health check on the frontend container
